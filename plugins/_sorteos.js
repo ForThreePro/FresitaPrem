@@ -15,11 +15,9 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
-    // FUNCION PARA CONVERTIR LID A JID NORMAL
     const decodeJid = (jid) => {
         if (!jid) return jid
         if (jid.includes('@lid')) {
-            // Baileys convierte lid a numero
             let user = jid.split('@')[0]
             return user + '@s.whatsapp.net'
         }
@@ -29,13 +27,13 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
     function getTargetUsers() {
         let targets = new Set()
 
-        // 1. MENCIONES OFICIALES - DECODIFICAR LID
+        // 1. MENCIONES OFICIALES
         if (m.mentionedJid && m.mentionedJid.length > 0) {
             m.mentionedJid.forEach(j => targets.add(decodeJid(j)))
         }
 
         // 2. ESCANEAR @NUMEROS
-        let textoCompleto = (m.text || '') + ' + (m.quoted?.text || '')
+        let textoCompleto = (m.text || '') + ' ' + (m.quoted?.text || '')
         let matches = textoCompleto.match(/@(\d{8,15})/g)
         if (matches) {
             matches.forEach(match => {
@@ -61,15 +59,14 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
             }
         })
 
-        // 4. RESPONDER - DECODIFICAR LID
+        // 4. RESPONDER
         if (m.quoted) {
             let jid = m.quoted.sender || m.quoted.key?.participant || m.quoted.key?.remoteJid
             if (jid) targets.add(decodeJid(jid))
         }
 
-        // FILTRO FINAL: SOLO DEL GRUPO - AHORA COMPARA DECODIFICADO
-        let groupJids = participants.map(p => p.id)
-        return [...targets].filter(t => groupJids.includes(t))
+        // FILTRO NUEVO: Solo que termine en @s.whatsapp.net
+        return [...targets].filter(t => t && t.endsWith('@s.whatsapp.net'))
     }
 
     const crearLista = (arr) => arr.map((u, i) => {
