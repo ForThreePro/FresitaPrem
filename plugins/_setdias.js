@@ -1,31 +1,78 @@
-import fs from 'fs'
-const path = './database/horarios.json'
+let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
+    if (!isAdmin) return m.reply('~*~*~*~*~*~*~*~*~*~\n ACCESO DENEGADO\n~*~*~*~*~*~*~*~*~*~')
 
-if (!fs.existsSync('./database')) fs.mkdirSync('./database')
-let db = { lunes: [], martes: [], miercoles: [], jueves: [], viernes: [], sabado: [] }
-if (fs.existsSync(path)) try { db = JSON.parse(fs.readFileSync(path)) } catch {}
-const save = () => fs.writeFileSync(path, JSON.stringify(db, null, 2))
+    global.db.data.sorteos = global.db.data.sorteos || {}
+    let sorteos = global.db.data.sorteos
+    let chatId = m.chat
+    let metadata = m.isGroup? await conn.groupMetadata(m.chat) : {}
+    let participants = metadata.participants || []
+    sorteos[chatId] = sorteos[chatId] || {}
 
-const mapa = { addlunes:'lunes', addmartes:'martes', addmiercoles:'miercoles', addjueves:'jueves', addviernes:'viernes', addsabado:'sabado' }
-const nombres = {lunes:'Lunes', martes:'Martes', miercoles:'Miércoles', jueves:'Jueves', viernes:'Viernes', sabado:'Sábado'}
-const tag = jid => '@' + jid.split('@')[0]
+    const dias = ['lunes','martes','miercoles','jueves','viernes','sabado']
+    const aurora = '~*~*~*~*~*~*~*~*~*~'
+    let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
-let handler = async (m, { conn, command }) => {
-    let dia = mapa[command]
-    let mentions = m.mentionedJid || m.msg?.contextInfo?.mentionedJid || []
+    let accion = command.startsWith('set')? 'set' : 'borrar'
+    let dia = command.replace('set','').replace('borrar','').toLowerCase()
 
-    if (mentions.length == 0) return m.reply(`*Uso:*.${command} @persona1 @persona2`)
+    if (!dias.includes(dia)) return
 
-    db[dia] = mentions
-    save()
-    await conn.sendMessage(m.chat, {
-        text: `✅ *${nombres[dia]}* guardado:\n${mentions.map(tag).join(' ')}`,
-        mentions
-    }, { quoted: m })
+    function getTargetUsers() {
+        let targets = new Set()
+        if (m.mentionedJid && m.mentionedJid.length > 0) m.mentionedJid.forEach(j => targets.add(j))
+        let textoCompleto = (m.text || '') + ' + (m.quoted?.text || '')
+        let matches = textoCompleto.match(/@(\d{8,})/g)
+        if (matches) matches.forEach(match => {
+            let num = match.replace(/[^0-9]/g, '')
+            if (num.length > 8) targets.add(num + '@s.whatsapp.net')
+        })
+        if (m.quoted) {
+            let jid = m.quoted.sender || m.quoted.key?.participant || m.quoted.key?.remoteJid
+            if (jid) targets.add(jid)
+        }
+        let args = (m.text || '').split(' ').slice(1)
+        args.forEach(arg => {
+            let name = arg.toLowerCase().replace('@','')
+            if (name.length > 2) {
+                let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
+                if (found) targets.add(found.id)
+            }
+        })
+        let groupJids = participants.map(p => p.id)
+        return [...targets].filter(t => groupJids.includes(t) || t.endsWith('@s.whatsapp.net'))
+    }
+
+    const crearLista = (arr) => arr.map((u, i) => `✨ ${i+1}. @${u.split('@')[0]}`).join('\n')
+
+    if (accion == 'set') {
+        let mentioned = getTargetUsers()
+        if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1\n${aurora}`)
+
+        sorteos[chatId][dia] = mentioned
+        let list = crearLista(mentioned)
+        let msg = `${aurora}
+    AURORA ${dia.toUpperCase()}
+${aurora}
+
+🌌 Estado: ASIGNADO
+📅 Fecha: ${new Date().toLocaleDateString('es')}
+
+✧ LUZ DEL NORTE ✧
+${list}
+
+~* brilla con tu sorteo *~
+Usa *${usedPrefix}${dia}* para recordar`
+        await conn.sendMessage(m.chat, { image: { url: pp }, caption: msg, mentions: mentioned })
+    }
+
+    if (accion == 'borrar') {
+        if (!sorteos[chatId][dia]) return m.reply(`${aurora}\n NO HAY LUZ EN ${dia.toUpperCase()}\n${aurora}`)
+        delete sorteos[chatId][dia]
+        return m.reply(`${aurora}\n AURORA APAGADA\nSe borró ${dia.toUpperCase()}\n${aurora}`)
+    }
 }
 
-handler.help = ['addlunes @tag']
-handler.tags = ['horario']
-handler.command = /^add(lunes|martes|miercoles|jueves|viernes|sabado)$/i
+handler.command = /^(setlunes|setmartes|setmiercoles|setjueves|setviernes|setsabado|borrarlunes|borrarmartes|borrarmiercoles|borrarjueves|borrarviernes|borrarsabado)$/i
 handler.group = true
+handler.admin = true
 export default handler
