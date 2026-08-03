@@ -9,20 +9,22 @@ const save = () => fs.writeFileSync(path, JSON.stringify(horarios, null, 2))
 const dias = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
 const nombres = {lunes:"Lunes", martes:"Martes", miercoles:"Miércoles", jueves:"Jueves", viernes:"Viernes", sabado:"Sábado"}
 
+// Convierte los jid a @numero para que se vea en el texto
+const tag = (jid) => '@' + jid.split('@')[0]
+
 let handler = async (m, { conn, command }) => {
-    // Agarra menciones para Gata/Stars
     let mentions = m.mentionedJid || m.msg?.contextInfo?.mentionedJid || []
 
     let dia = command.replace('set', '')
 
     if (command.startsWith('set')) {
-        if (mentions.length == 0) return m.reply(`*Ejemplo:*.set${dia} @persona1 @persona2\n\nTienes que mencionar tocando el nombre`)
+        if (mentions.length == 0) return m.reply(`*Ejemplo:*.set${dia} @persona1 @persona2`)
 
-        horarios[dia] = mentions // sobrescribe
+        horarios[dia] = [...new Set(mentions)] // evita duplicados
         save()
 
         return await conn.sendMessage(m.chat, {
-            text: `✅ Guardado para *${nombres[dia]}*`,
+            text: `✅ Guardado para *${nombres[dia]}*:\n${mentions.map(tag).join(' ')}`,
             mentions: mentions
         }, { quoted: m })
     }
@@ -31,9 +33,11 @@ let handler = async (m, { conn, command }) => {
         let personas = horarios[command]
         if (!personas || personas.length == 0) return m.reply(`*${nombres[command]}*\nSin IA asignada`)
 
+        let texto = `*${nombres[command]}*\nIA Asignada:\n${personas.map(tag).join('\n')}`
+
         return await conn.sendMessage(m.chat, {
-            text: `*${nombres[command]}*\nIA Asignada:`,
-            mentions: personas
+            text: texto,
+            mentions: personas // ESTO es lo que hace que los @ funcionen
         }, { quoted: m })
     }
 
@@ -44,7 +48,7 @@ let handler = async (m, { conn, command }) => {
             txt += `*${nombres[d]}:*\n`
             if (horarios[d].length > 0) {
                 horarios[d].forEach(p => {
-                    txt += `> @${p.split('@')[0]}\n`
+                    txt += `> ${tag(p)}\n`
                     todos.push(p)
                 })
             } else txt += `> Sin asignar\n`
@@ -52,7 +56,7 @@ let handler = async (m, { conn, command }) => {
         }
         return await conn.sendMessage(m.chat, {
             text: txt,
-            mentions: todos
+            mentions: [...new Set(todos)] // quita duplicados
         }, { quoted: m })
     }
 }
