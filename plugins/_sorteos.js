@@ -15,16 +15,27 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
+    // FUNCION PARA CONVERTIR LID A JID NORMAL
+    const decodeJid = (jid) => {
+        if (!jid) return jid
+        if (jid.includes('@lid')) {
+            // Baileys convierte lid a numero
+            let user = jid.split('@')[0]
+            return user + '@s.whatsapp.net'
+        }
+        return jid
+    }
+
     function getTargetUsers() {
         let targets = new Set()
 
-        // 1. MENCIONES OFICIALES TOCANDO @
+        // 1. MENCIONES OFICIALES - DECODIFICAR LID
         if (m.mentionedJid && m.mentionedJid.length > 0) {
-            m.mentionedJid.forEach(j => targets.add(j))
+            m.mentionedJid.forEach(j => targets.add(decodeJid(j)))
         }
 
         // 2. ESCANEAR @NUMEROS
-        let textoCompleto = (m.text || '') + ' ' + (m.quoted?.text || '')
+        let textoCompleto = (m.text || '') + ' + (m.quoted?.text || '')
         let matches = textoCompleto.match(/@(\d{8,15})/g)
         if (matches) {
             matches.forEach(match => {
@@ -33,17 +44,16 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
             })
         }
 
-        // 3. ESCANEAR @NOMBRES - NUEVO
+        // 3. ESCANEAR @NOMBRES
         let args = (m.text || '').split(' ').slice(1)
         args.forEach(arg => {
             if (arg.startsWith('@')) {
-                let name = arg.slice(1).toLowerCase() // quita el @
+                let name = arg.slice(1).toLowerCase()
                 if (name.length > 1) {
                     let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
                     if (found) targets.add(found.id)
                 }
             }
-            // 4. TAMBIEN SIN @ POR SI ACASO
             else if (arg.length > 2 &&!/^\d+$/.test(arg)) {
                 let name = arg.toLowerCase()
                 let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
@@ -51,13 +61,13 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
             }
         })
 
-        // 5. RESPONDER
+        // 4. RESPONDER - DECODIFICAR LID
         if (m.quoted) {
             let jid = m.quoted.sender || m.quoted.key?.participant || m.quoted.key?.remoteJid
-            if (jid && jid.includes('@s.whatsapp.net')) targets.add(jid)
+            if (jid) targets.add(decodeJid(jid))
         }
 
-        // FILTRO FINAL: SOLO DEL GRUPO
+        // FILTRO FINAL: SOLO DEL GRUPO - AHORA COMPARA DECODIFICADO
         let groupJids = participants.map(p => p.id)
         return [...targets].filter(t => groupJids.includes(t))
     }
