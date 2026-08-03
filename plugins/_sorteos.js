@@ -15,21 +15,28 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
-    const decodeJid = (jid) => {
-        if (!jid) return jid
-        if (jid.includes('@lid')) {
-            let user = jid.split('@')[0]
-            return user + '@s.whatsapp.net'
+    // CONVERTIR LID A NUMERO REAL USANDO LA LISTA DEL GRUPO
+    const fixJid = (jid) => {
+        if (!jid) return null
+        if (jid.endsWith('@s.whatsapp.net')) return jid
+        if (jid.endsWith('@lid')) {
+            let lid = jid.split('@')[0]
+            // Buscar en participants quien tiene ese lid
+            let p = participants.find(x => x.id.includes(lid) || x.lid?.includes(lid))
+            if (p) return p.id
         }
-        return jid
+        return null
     }
 
     function getTargetUsers() {
         let targets = new Set()
 
-        // 1. MENCIONES OFICIALES
+        // 1. MENCIONES OFICIALES - ARREGLAR LID
         if (m.mentionedJid && m.mentionedJid.length > 0) {
-            m.mentionedJid.forEach(j => targets.add(decodeJid(j)))
+            m.mentionedJid.forEach(j => {
+                let fixed = fixJid(j)
+                if (fixed) targets.add(fixed)
+            })
         }
 
         // 2. ESCANEAR @NUMEROS
@@ -42,35 +49,33 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
             })
         }
 
-        // 3. ESCANEAR @NOMBRES
+        // 3. ESCANEAR @NOMBRES - MEJORADO
         let args = (m.text || '').split(' ').slice(1)
         args.forEach(arg => {
             if (arg.startsWith('@')) {
-                let name = arg.slice(1).toLowerCase()
+                let name = arg.slice(1).toLowerCase().trim()
                 if (name.length > 1) {
-                    let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
+                    let found = participants.find(p => {
+                        let n = conn.getName(p.id).toLowerCase()
+                        return n.includes(name) || name.includes(n.split(' ')[0])
+                    })
                     if (found) targets.add(found.id)
                 }
-            }
-            else if (arg.length > 2 &&!/^\d+$/.test(arg)) {
-                let name = arg.toLowerCase()
-                let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
-                if (found) targets.add(found.id)
             }
         })
 
         // 4. RESPONDER
         if (m.quoted) {
-            let jid = m.quoted.sender || m.quoted.key?.participant || m.quoted.key?.remoteJid
-            if (jid) targets.add(decodeJid(jid))
+            let jid = m.quoted.sender || m.quoted.key?.participant
+            let fixed = fixJid(jid)
+            if (fixed) targets.add(fixed)
         }
 
-        // FILTRO NUEVO: Solo que termine en @s.whatsapp.net
-        return [...targets].filter(t => t && t.endsWith('@s.whatsapp.net'))
+        return [...targets]
     }
 
     const crearLista = (arr) => arr.map((u, i) => {
-        let num = u.split('@')[0].replace(/[^0-9]/g, '')
+        let num = u.split('@')[0]
         return `✨ ${i+1}. @${num}`
     }).join('\n')
 
