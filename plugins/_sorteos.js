@@ -3,6 +3,7 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
     global.db.data.sorteos = global.db.data.sorteos || {}
     let sorteos = global.db.data.sorteos
     let chatId = m.chat
+    let participants = m.isGroup? (await conn.groupMetadata(m.chat)).participants : []
 
     const dias = ['lunes','martes','miercoles','jueves','viernes','sabado']
     const emojis = {lunes:'🌙', martes:'🌌', miercoles:'✨', jueves:'🌠', viernes:'💫', sabado:'👑'}
@@ -14,13 +15,48 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
     // Obtener foto del grupo
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
+    // ===== FUNCION PARA DETECTAR USUARIOS FORZADA =====
+    function getTargetUsers() {
+        let targets = []
+
+        // PRIORIDAD 1: MENCION TOCANDO @
+        if (m.mentionedJid && m.mentionedJid.length > 0) {
+            targets = m.mentionedJid
+        }
+        // PRIORIDAD 2: RESPONDER MENSAJE
+        else if (m.quoted) {
+            targets = [m.quoted.sender]
+            // Anti-bug Baileys
+            if (targets[0] === m.sender && m.quoted.text) {
+                let match = m.quoted.text.match(/@(\d{8,})/)
+                if (match) targets = [match[1] + '@s.whatsapp.net']
+            }
+        }
+        // PRIORIDAD 3: ESCRIBIR NOMBRE/NUMERO
+        else if (m.text) {
+            let args = m.text.split(' ').slice(1) // quita el comando
+            for (let arg of args) {
+                let name = arg.toLowerCase().replace('@','')
+                // Busca por nombre
+                let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
+                if (found) targets.push(found.id)
+                else {
+                    // Busca por numero
+                    let num = arg.replace(/[^0-9]/g, '')
+                    if (num.length > 8) targets.push(num + '@s.whatsapp.net')
+                }
+            }
+        }
+        return [...new Set(targets)] // quita duplicados
+    }
+
     // ===== 1. ASIGNAR.setlunes @user =====
     if (command.startsWith('set')) {
         if (!isAdmin) return m.reply(`${aurora}\n ACCESO DENEGADO\n${aurora}`)
         if (!dias.includes(dia)) return m.reply(`${aurora}\n DÍA INVÁLIDO\n${aurora}`)
 
-        let mentioned = m.mentionedJid
-        if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1 @user2\n${aurora}`)
+        let mentioned = getTargetUsers() // AHORA USA LA FUNCION FORZADA
+        if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1 @user2\nO responde + ${usedPrefix}set${dia}\n${aurora}`)
 
         sorteos[chatId][dia] = [...new Set(mentioned)]
 
@@ -69,7 +105,7 @@ ${list}
 
 ~* Tareas estelares *~
 1. Realizar sorteo
-2. Pedir reacciones 
+2. Pedir reacciones
 3. Compartir evidencia
 
 Que tu luz ilumine el grupo ✨`
