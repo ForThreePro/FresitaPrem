@@ -72,21 +72,23 @@ let handler = async (m, { conn, isAdmin, command, args }) => {
 
                 await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
 
+                // CAMBIO: Ahora muestra la LISTA COMPLETA siempre
                 let txt = `*🍓 BOT FRESITA*
 
-╭─「 📅 SORTEO ${dia.toUpperCase()} 」─╮
+╭─「 📅 ACTUALIZADO ${dia.toUpperCase()} 」─╮
 │
-│ *AGREGADOS:* ${nuevos.length}
-${nuevos.map(v => `│ 👉 @${v.split('@')[0]}`).join('\n')}
+│ *NUEVOS:* ${nuevos.length > 0? nuevos.map(v => `@${v.split('@')[0]}`).join(', ') : 'Ninguno'}
 │
-│ *TOTAL EN ${dia}:* ${lista.length} personas
-╰──────────────────────────╯
+│ *LISTA ACTUAL:* ${lista.length} personas
+${lista.map((v,i) => `│ ${i+1}. @${v.split('@')[0]}`).join('\n')}
+│
+╰───────────────────────────────╯
 
-> *"Anotado para el sorteo"*
+> *"Lista actualizada para el sorteo"*
 `
-                await conn.reply(m.chat, txt, m, { mentions: nuevos })
+                await conn.reply(m.chat, txt, m, { mentions: lista }) // MENCIONA A TODOS
 
-            // SI NO HAY GENTE = MOSTRAR LISTA
+            // SI NO HAY GENTE = SOLO MOSTRAR LISTA
             } else {
                 if (lista.length === 0) return m.reply(`*🍓 BOT FRESITA*\n\n📭 No hay nadie registrado para el día *${dia}*`)
 
