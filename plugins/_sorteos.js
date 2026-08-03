@@ -14,13 +14,9 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
-    // ===== FUNCION PARA DETECTAR USUARIOS FORZADA =====
     function getTargetUsers() {
         let targets = []
-
-        if (m.mentionedJid && m.mentionedJid.length > 0) {
-            targets = m.mentionedJid
-        }
+        if (m.mentionedJid && m.mentionedJid.length > 0) targets = m.mentionedJid
         else if (m.quoted) {
             targets = [m.quoted.sender]
             if (targets[0] === m.sender && m.quoted.text) {
@@ -43,8 +39,17 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
         return [...new Set(targets)]
     }
 
-    // FUNCION PARA CREAR LISTA CON MENCION
-    const crearLista = (arr) => arr.map((u, i) => `✨ ${i+1}. @${u.split('@')[0]}`).join('\n')
+    // NUEVA FUNCION: LIMPIA EL NUMERO Y PONE NOMBRE SI SE PUEDE
+    const crearLista = async (arr) => {
+        let lista = []
+        for(let i = 0; i < arr.length; i++) {
+            let jid = arr[i]
+            let num = jid.split('@')[0].replace(/[^0-9]/g, '') // quita + y espacios
+            let name = await conn.getName(jid).catch(() => num) // intenta agarrar el nombre
+            lista.push(`✨ ${i+1}. @${num} ${name!== num? `(${name})` : ''}`) // @numero (Nombre)
+        }
+        return lista.join('\n')
+    }
 
     // ===== 1. ASIGNAR.setlunes =====
     if (command.startsWith('set')) {
@@ -56,7 +61,7 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
         sorteos[chatId][dia] = mentioned
 
-        let list = crearLista(mentioned) // AQUI YA PONE @numero
+        let list = await crearLista(mentioned) // AHORA ES AWAIT
         let msg = `${aurora}
     AURORA ${dia.toUpperCase()}
 ${aurora}
@@ -87,7 +92,7 @@ Usa *${usedPrefix}${dia}* para recordar`
         let asignados = sorteos[chatId][command.toLowerCase()]
         if (!asignados ||!asignados.length) return m.reply(`${aurora}\n CIELO VACÍO\nUsa: ${usedPrefix}set${command} @user\n${aurora}`)
 
-        let list = crearLista(asignados) // AQUI TAMBIEN
+        let list = await crearLista(asignados) // AWAIT AQUI TAMBIEN
 
         let msg = `${aurora}
     AURORA ${command.toUpperCase()}
@@ -122,10 +127,9 @@ ${aurora}\n`
         for(let d of dias){
             if(!Array.isArray(sorteos[chatId][d]) || sorteos[chatId][d].length === 0) continue
             txt += `\n🌌 ${emojis[d]} ${d.toUpperCase()}\n`
-            sorteos[chatId][d].forEach((u, i) => {
-                txt += `✨ ${i+1}. @${u.split('@')[0]}\n` // AQUI TAMBIEN
-                todos.push(u)
-            })
+            let listaDia = await crearLista(sorteos[chatId][d]) // AWAIT
+            txt += listaDia + '\n'
+            todos.push(...sorteos[chatId][d])
         }
         txt += `\n~* que las auroras los guíen *~`
         await conn.sendMessage(m.chat, { image: { url: pp }, caption: txt, mentions: [...new Set(todos)] })
