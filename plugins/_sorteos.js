@@ -15,43 +15,44 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
-    // ===== DETECTOR NIVEL DIOS =====
+    // ===== DETECTOR NIVEL DIOS V2 =====
     function getTargetUsers() {
         let targets = new Set()
 
-        // PRIORIDAD 1: MENCIONES OFICIALES TOCANDO @
+        // PRIORIDAD 1: MENCIONES OFICIALES
         if (m.mentionedJid && m.mentionedJid.length > 0) {
             m.mentionedJid.forEach(j => targets.add(j))
         }
 
-        // PRIORIDAD 2: ESCANEAR TODO EL TEXTO BUSCANDO @NUMEROS
+        // PRIORIDAD 2: ESCANEAR @NUMEROS EN TEXTO
         let textoCompleto = (m.text || '') + ' ' + (m.quoted?.text || '')
-        let matches = textoCompleto.match(/@(\d{8,})/g) // agarra @51987654321 @+51 987 etc
+        let matches = textoCompleto.match(/@(\d{8,})/g)
         if (matches) {
             matches.forEach(match => {
-                let num = match.replace(/[^0-9]/g, '') // limpia @+51 987 -> 51987
+                let num = match.replace(/[^0-9]/g, '')
                 if (num.length > 8) targets.add(num + '@s.whatsapp.net')
             })
         }
 
-        // PRIORIDAD 3: RESPONDER MENSAJE
+        // PRIORIDAD 3: RESPONDER - FORZADO NIVEL BOSS
         if (m.quoted) {
-            targets.add(m.quoted.sender)
+            let jid = m.quoted.sender || m.quoted.key?.participant || m.quoted.key?.remoteJid
+            if (jid) targets.add(jid)
         }
 
-        // PRIORIDAD 4: BUSCAR POR NOMBRE
+        // PRIORIDAD 4: POR NOMBRE
         let args = (m.text || '').split(' ').slice(1)
         args.forEach(arg => {
             let name = arg.toLowerCase().replace('@','')
-            if (name.length > 2) { // evita buscar "a", "el"
+            if (name.length > 2) {
                 let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
                 if (found) targets.add(found.id)
             }
         })
 
-        // FILTRO: SOLO USUARIOS DEL GRUPO
+        // FILTRO: SOLO DEL GRUPO
         let groupJids = participants.map(p => p.id)
-        return [...targets].filter(t => groupJids.includes(t))
+        return [...targets].filter(t => groupJids.includes(t) || t.endsWith('@s.whatsapp.net'))
     }
 
     const crearLista = (arr) => arr.map((u, i) => {
@@ -59,7 +60,7 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
         return `✨ ${i+1}. @${num}`
     }).join('\n')
 
-    // ===== 1. ASIGNAR.setlunes =====
+    // ===== 1. ASIGNAR =====
     if (command.startsWith('set')) {
         if (!isAdmin) return m.reply(`${aurora}\n ACCESO DENEGADO\n${aurora}`)
         if (!dias.includes(dia)) return m.reply(`${aurora}\n DÍA INVÁLIDO\n${aurora}`)
@@ -68,7 +69,6 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
         if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1 @user2\nO escribe @numero\nO responde + ${usedPrefix}set${dia}\n${aurora}`)
 
         sorteos[chatId][dia] = mentioned
-
         let list = crearLista(mentioned)
         let msg = `${aurora}
     AURORA ${dia.toUpperCase()}
@@ -101,7 +101,6 @@ Usa *${usedPrefix}${dia}* para recordar`
         if (!asignados ||!asignados.length) return m.reply(`${aurora}\n CIELO VACÍO\nUsa: ${usedPrefix}set${command} @user\n${aurora}`)
 
         let list = crearLista(asignados)
-
         let msg = `${aurora}
     AURORA ${command.toUpperCase()}
 ${aurora}
