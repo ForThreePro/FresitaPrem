@@ -4,8 +4,8 @@ let handler = async (m, { conn, isAdmin, command, args }) => {
     if (!m.isGroup) return m.reply(`🎀 *BOT FRESITA* 🎀\n\n🌸 Este comando solo funciona en grupos 🌸`)
     if (!isAdmin) return m.reply(`🎀 *BOT FRESITA* 🎀\n\n💅 Solo admins pueden usar este comando preciosa`)
 
-    let diasValidos = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo']
-    let emojis = {lunes:'🌙', martes:'💖', miercoles:'🌷', jueves:'👀', viernes:'💕', sabado:'🎀', domingo:'🌹'}
+    let diasValidos = ['lunes','martes','miercoles','jueves','viernes','sabado'] // SIN DOMINGO
+    let emojis = {lunes:'🌙', martes:'💖', miercoles:'🌷', jueves:'👀', viernes:'💕', sabado:'🎀'}
 
     if (!dbSorteos[m.chat]) dbSorteos[m.chat] = {}
     diasValidos.forEach(d => { if (!dbSorteos[m.chat][d]) dbSorteos[m.chat][d] = [] })
@@ -14,7 +14,7 @@ let handler = async (m, { conn, isAdmin, command, args }) => {
         // ====== COMANDO:.verlunes.vermartes etc ======
         if (command.startsWith('ver')) {
             let dia = command.replace('ver','')
-            if (!diasValidos.includes(dia)) return m.reply(`🎀 *BOT FRESITA* 🎀\n\n❌ Usa:.ver[lunes-domingo]\nEjemplo:.verlunes`)
+            if (!diasValidos.includes(dia)) return m.reply(`🎀 *BOT FRESITA* 🎀\n\n❌ Usa:.ver[lunes-sabado]\nEjemplo:.verlunes`)
 
             let lista = dbSorteos[m.chat][dia]
             if (lista.length === 0) return m.reply(`🎀 *BOT FRESITA* 🎀\n\n🌸 Awww no hay nadie anotado para el ${emojis[dia]} *${dia}* 🌸`)
@@ -39,7 +39,7 @@ let handler = async (m, { conn, isAdmin, command, args }) => {
         if (command === 'tabla') {
             await conn.sendMessage(m.chat, { react: { text: '📊', key: m.key } })
             let totalGeneral = 0
-            let texto = `🎀 *BOT FRESITA* 🎀\n\n╭─── ⋆⋅ ♡ ⋅⋆ ───╮\n 📊 TABLA DE LA SEMANA 📊\n╰─── ⋆⋅ ♡ ⋅⋆ ───╯\n\n`
+            let texto = `🎀 *BOT FRESITA* 🎀\n\n╭─── ⋆⋅ ♡ ⋅⋆ ───╮\n 📊 TABLA LUNES A SÁBADO 📊\n╰─── ⋆⋅ ♡ ⋅⋆ ───╯\n\n`
 
             diasValidos.forEach(d => {
                 let lista = dbSorteos[m.chat][d]
@@ -59,9 +59,9 @@ let handler = async (m, { conn, isAdmin, command, args }) => {
 
             if (target === 'todo') {
                 diasValidos.forEach(d => dbSorteos[m.chat][d] = [])
-                return m.reply(`🎀 *BOT FRESITA* 🎀\n\n✨ Se limpió toda la semana ✨\nEmpezamos de 0 mi amor 🌸`)
+                return m.reply(`🎀 *BOT FRESITA* 🎀\n\n✨ Se limpió toda la semana ✨\nDe lunes a sábado 🌸`)
             }
-            if (!diasValidos.includes(target)) return m.reply(`🎀 *BOT FRESITA* 🎀\n\n❌ Usa:.limpiar[lunes-domingo] o.limpiar todo`)
+            if (!diasValidos.includes(target)) return m.reply(`🎀 *BOT FRESITA* 🎀\n❌ Usa:.limpiar[lunes-sabado] o.limpiar todo`)
 
             dbSorteos[m.chat][target] = []
             return m.reply(`🎀 *BOT FRESITA* 🎀\n\n💖 Se limpió la lista del ${emojis[target]} *${target}* 💖`)
@@ -73,7 +73,7 @@ let handler = async (m, { conn, isAdmin, command, args }) => {
             let lista = dbSorteos[m.chat][dia]
 
             if (!m.quoted) {
-                return m.reply(`🎀 *BOT FRESITA* 🎀\n\n❌ Amorcito tienes que *responder al mensaje* de la persona\n\nEjemplo: Responde al mensaje de Pepito y pon.${dia} 🌷\n\n.${dia} @Pepito ← Esto no sirve`)
+                return m.reply(`🎀 *BOT FRESITA* 🎀\n\n❌ Amorcito tienes que *responder al mensaje* de la persona\n\nEjemplo: Responde al mensaje de Pepito y pon.${dia} 🌷`)
             }
 
             let jid = m.quoted.sender
@@ -105,8 +105,25 @@ ${lista.map((v,i) => `🌹 ${i+1}. @${v.split('@')[0]}`).join('\n')}
     }
 }
 
-handler.help = ['lunes','verlunes','tabla','limpiar']
+// HELP SIN DOMINGO 🍓
+handler.help = [
+'lunes ( Responde Al Mensaje )',
+'martes ( Responde Al Mensaje )',
+'miercoles ( Responde Al Mensaje )',
+'jueves ( Responde Al Mensaje )',
+'viernes ( Responde Al Mensaje )',
+'sabado ( Responde Al Mensaje )',
+'verlunes ( Ver Día Lunes )',
+'vermartes ( Ver Día Martes )',
+'vermiercoles ( Ver Día Miércoles )',
+'verjueves ( Ver Día Jueves )',
+'veviernes ( Ver Día Viernes )',
+'versabado ( Ver Día Sábado )',
+'tabla ( Ver Días Completos )',
+'limpiar (lunes, martes, miercoles, etc )',
+'limpiar todo'
+]
 handler.tags = ['sorteo']
-handler.command = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo','verlunes','vermartes','vermiercoles','verjueves','viernes','versabado','verdomingo','tabla','limpiar']
+handler.command = ['lunes','martes','miercoles','jueves','viernes','sabado','verlunes','vermartes','vermiercoles','verjueves','viernes','versabado','tabla','limpiar']
 handler.admin = true
 export default handler
