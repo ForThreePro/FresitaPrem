@@ -15,44 +15,44 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
-    // ===== DETECTOR NIVEL DIOS V2 =====
     function getTargetUsers() {
         let targets = new Set()
 
-        // PRIORIDAD 1: MENCIONES OFICIALES
+        // 1. MENCIONES OFICIALES
         if (m.mentionedJid && m.mentionedJid.length > 0) {
             m.mentionedJid.forEach(j => targets.add(j))
         }
 
-        // PRIORIDAD 2: ESCANEAR @NUMEROS EN TEXTO
+        // 2. ESCANEAR @NUMEROS - AHORA SOLO SI TIENE 8+ DIGITOS
         let textoCompleto = (m.text || '') + ' ' + (m.quoted?.text || '')
-        let matches = textoCompleto.match(/@(\d{8,})/g)
+        // Nuevo regex: @ seguido de 8 a 15 digitos. Ignora @ solo
+        let matches = textoCompleto.match(/@(\d{8,15})/g)
         if (matches) {
             matches.forEach(match => {
                 let num = match.replace(/[^0-9]/g, '')
-                if (num.length > 8) targets.add(num + '@s.whatsapp.net')
+                if (num.length >= 8 && num.length <= 15) targets.add(num + '@s.whatsapp.net')
             })
         }
 
-        // PRIORIDAD 3: RESPONDER - FORZADO NIVEL BOSS
+        // 3. RESPONDER - TRIPLE FORZADO
         if (m.quoted) {
             let jid = m.quoted.sender || m.quoted.key?.participant || m.quoted.key?.remoteJid
-            if (jid) targets.add(jid)
+            if (jid && jid.includes('@s.whatsapp.net')) targets.add(jid)
         }
 
-        // PRIORIDAD 4: POR NOMBRE
+        // 4. POR NOMBRE
         let args = (m.text || '').split(' ').slice(1)
         args.forEach(arg => {
             let name = arg.toLowerCase().replace('@','')
-            if (name.length > 2) {
+            if (name.length > 2 &&!/^\d+$/.test(name)) { // que no sea solo numeros
                 let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
                 if (found) targets.add(found.id)
             }
         })
 
-        // FILTRO: SOLO DEL GRUPO
+        // FILTRO FINAL: SOLO DEL GRUPO
         let groupJids = participants.map(p => p.id)
-        return [...targets].filter(t => groupJids.includes(t) || t.endsWith('@s.whatsapp.net'))
+        return [...targets].filter(t => groupJids.includes(t))
     }
 
     const crearLista = (arr) => arr.map((u, i) => {
@@ -66,7 +66,7 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
         if (!dias.includes(dia)) return m.reply(`${aurora}\n DÍA INVÁLIDO\n${aurora}`)
 
         let mentioned = getTargetUsers()
-        if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1 @user2\nO escribe @numero\nO responde + ${usedPrefix}set${dia}\n${aurora}`)
+        if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1 @user2\nO escribe @51987654321\nO responde + ${usedPrefix}set${dia}\n${aurora}`)
 
         sorteos[chatId][dia] = mentioned
         let list = crearLista(mentioned)
