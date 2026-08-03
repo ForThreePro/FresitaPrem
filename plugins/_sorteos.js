@@ -3,7 +3,8 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
     global.db.data.sorteos = global.db.data.sorteos || {}
     let sorteos = global.db.data.sorteos
     let chatId = m.chat
-    let participants = m.isGroup? (await conn.groupMetadata(m.chat)).participants : []
+    let metadata = m.isGroup? await conn.groupMetadata(m.chat) : {}
+    let participants = metadata.participants || []
 
     const dias = ['lunes','martes','miercoles','jueves','viernes','sabado']
     const emojis = {lunes:'🌙', martes:'🌌', miercoles:'✨', jueves:'🌠', viernes:'💫', sabado:'👑'}
@@ -14,34 +15,47 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
     let pp = await conn.profilePictureUrl(chatId, 'image').catch(_ => 'https://i.imgur.com/8K2JhZQ.jpg')
 
+    // ===== DETECTOR NIVEL DIOS =====
     function getTargetUsers() {
-        let targets = []
-        if (m.mentionedJid && m.mentionedJid.length > 0) targets = m.mentionedJid
-        else if (m.quoted) {
-            targets = [m.quoted.sender]
-            if (targets[0] === m.sender && m.quoted.text) {
-                let match = m.quoted.text.match(/@(\d{8,})/)
-                if (match) targets = [match[1] + '@s.whatsapp.net']
-            }
+        let targets = new Set()
+
+        // PRIORIDAD 1: MENCIONES OFICIALES TOCANDO @
+        if (m.mentionedJid && m.mentionedJid.length > 0) {
+            m.mentionedJid.forEach(j => targets.add(j))
         }
-        else if (m.text) {
-            let args = m.text.split(' ').slice(1)
-            for (let arg of args) {
-                let name = arg.toLowerCase().replace('@','')
+
+        // PRIORIDAD 2: ESCANEAR TODO EL TEXTO BUSCANDO @NUMEROS
+        let textoCompleto = (m.text || '') + ' ' + (m.quoted?.text || '')
+        let matches = textoCompleto.match(/@(\d{8,})/g) // agarra @51987654321 @+51 987 etc
+        if (matches) {
+            matches.forEach(match => {
+                let num = match.replace(/[^0-9]/g, '') // limpia @+51 987 -> 51987
+                if (num.length > 8) targets.add(num + '@s.whatsapp.net')
+            })
+        }
+
+        // PRIORIDAD 3: RESPONDER MENSAJE
+        if (m.quoted) {
+            targets.add(m.quoted.sender)
+        }
+
+        // PRIORIDAD 4: BUSCAR POR NOMBRE
+        let args = (m.text || '').split(' ').slice(1)
+        args.forEach(arg => {
+            let name = arg.toLowerCase().replace('@','')
+            if (name.length > 2) { // evita buscar "a", "el"
                 let found = participants.find(p => conn.getName(p.id).toLowerCase().includes(name))
-                if (found) targets.push(found.id)
-                else {
-                    let num = arg.replace(/[^0-9]/g, '')
-                    if (num.length > 8) targets.push(num + '@s.whatsapp.net')
-                }
+                if (found) targets.add(found.id)
             }
-        }
-        return [...new Set(targets)]
+        })
+
+        // FILTRO: SOLO USUARIOS DEL GRUPO
+        let groupJids = participants.map(p => p.id)
+        return [...targets].filter(t => groupJids.includes(t))
     }
 
-    // SIN AWAIT, SOLO LIMPIA EL NUMERO
     const crearLista = (arr) => arr.map((u, i) => {
-        let num = u.split('@')[0].replace(/[^0-9]/g, '') // @+27 179... -> @27179...
+        let num = u.split('@')[0].replace(/[^0-9]/g, '')
         return `✨ ${i+1}. @${num}`
     }).join('\n')
 
@@ -51,7 +65,7 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
         if (!dias.includes(dia)) return m.reply(`${aurora}\n DÍA INVÁLIDO\n${aurora}`)
 
         let mentioned = getTargetUsers()
-        if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1 @user2\nO responde + ${usedPrefix}set${dia}\n${aurora}`)
+        if (mentioned.length === 0) return m.reply(`${aurora}\n FALTA MENCIONAR\nEj: ${usedPrefix}set${dia} @user1 @user2\nO escribe @numero\nO responde + ${usedPrefix}set${dia}\n${aurora}`)
 
         sorteos[chatId][dia] = mentioned
 
@@ -121,7 +135,7 @@ ${aurora}\n`
         for(let d of dias){
             if(!Array.isArray(sorteos[chatId][d]) || sorteos[chatId][d].length === 0) continue
             txt += `\n🌌 ${emojis[d]} ${d.toUpperCase()}\n`
-            txt += crearLista(sorteos[chatId][d]) + '\n' // SIN AWAIT
+            txt += crearLista(sorteos[chatId][d]) + '\n'
             todos.push(...sorteos[chatId][d])
         }
         txt += `\n~* que las auroras los guíen *~`
