@@ -8,24 +8,20 @@ if (fs.existsSync(path)) horarios = JSON.parse(fs.readFileSync(path))
 const save = () => fs.writeFileSync(path, JSON.stringify(horarios, null, 2))
 const dias = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
 const nombres = {lunes:"Lunes", martes:"Martes", miercoles:"Miércoles", jueves:"Jueves", viernes:"Viernes", sabado:"Sábado"}
+const tag = jid => '@' + jid.split('@')[0]
 
-// Convierte los jid a @numero para que se vea en el texto
-const tag = (jid) => '@' + jid.split('@')[0]
-
-let handler = async (m, { conn, command }) => {
+let handler = async (m, { conn, command, usedPrefix }) => {
     let mentions = m.mentionedJid || m.msg?.contextInfo?.mentionedJid || []
 
-    let dia = command.replace('set', '')
-
     if (command.startsWith('set')) {
-        if (mentions.length == 0) return m.reply(`*Ejemplo:*.set${dia} @persona1 @persona2`)
+        let dia = command.replace('set', '')
+        if (mentions.length == 0) return m.reply(`*Uso:* ${usedPrefix}set${dia} @persona1 @persona2`)
 
-        horarios[dia] = [...new Set(mentions)] // evita duplicados
+        horarios[dia] = mentions
         save()
-
         return await conn.sendMessage(m.chat, {
             text: `✅ Guardado para *${nombres[dia]}*:\n${mentions.map(tag).join(' ')}`,
-            mentions: mentions
+            mentions
         }, { quoted: m })
     }
 
@@ -34,36 +30,29 @@ let handler = async (m, { conn, command }) => {
         if (!personas || personas.length == 0) return m.reply(`*${nombres[command]}*\nSin IA asignada`)
 
         let texto = `*${nombres[command]}*\nIA Asignada:\n${personas.map(tag).join('\n')}`
-
-        return await conn.sendMessage(m.chat, {
-            text: texto,
-            mentions: personas // ESTO es lo que hace que los @ funcionen
-        }, { quoted: m })
+        return await conn.sendMessage(m.chat, { text: texto, mentions: personas }, { quoted: m })
     }
 
     if (command == 'ver1') {
         let txt = `*📅 HORARIO DE IAS LUNES A SÁBADO*\n\n`
         let todos = []
-        for (let d of dias) {
+        dias.forEach(d => {
             txt += `*${nombres[d]}:*\n`
             if (horarios[d].length > 0) {
-                horarios[d].forEach(p => {
-                    txt += `> ${tag(p)}\n`
-                    todos.push(p)
-                })
+                horarios[d].forEach(p => { txt += `> ${tag(p)}\n`; todos.push(p) })
             } else txt += `> Sin asignar\n`
             txt += `\n`
-        }
-        return await conn.sendMessage(m.chat, {
-            text: txt,
-            mentions: [...new Set(todos)] // quita duplicados
-        }, { quoted: m })
+        })
+        return await conn.sendMessage(m.chat, { text: txt, mentions: [...new Set(todos)] }, { quoted: m })
     }
 }
 
 handler.help = ['setlunes @tag', 'lunes', 'ver1']
 handler.tags = ['horario']
-handler.command = /^(setlunes|setmartes|setmiercoles|setjueves|setviernes|setsabado|lunes|martes|miercoles|jueves|viernes|sabado|ver1)$/i
+handler.command = [
+    'setlunes','setmartes','setmiercoles','setjueves','setviernes','setsabado',
+    'lunes','martes','miercoles','jueves','viernes','sabado','ver1'
+]
 handler.group = true
 
 export default handler
