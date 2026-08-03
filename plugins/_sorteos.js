@@ -39,17 +39,11 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
         return [...new Set(targets)]
     }
 
-    // NUEVA FUNCION: LIMPIA EL NUMERO Y PONE NOMBRE SI SE PUEDE
-    const crearLista = async (arr) => {
-        let lista = []
-        for(let i = 0; i < arr.length; i++) {
-            let jid = arr[i]
-            let num = jid.split('@')[0].replace(/[^0-9]/g, '') // quita + y espacios
-            let name = await conn.getName(jid).catch(() => num) // intenta agarrar el nombre
-            lista.push(`✨ ${i+1}. @${num} ${name!== num? `(${name})` : ''}`) // @numero (Nombre)
-        }
-        return lista.join('\n')
-    }
+    // SIN AWAIT, SOLO LIMPIA EL NUMERO
+    const crearLista = (arr) => arr.map((u, i) => {
+        let num = u.split('@')[0].replace(/[^0-9]/g, '') // @+27 179... -> @27179...
+        return `✨ ${i+1}. @${num}`
+    }).join('\n')
 
     // ===== 1. ASIGNAR.setlunes =====
     if (command.startsWith('set')) {
@@ -61,7 +55,7 @@ let handler = async (m, { conn, command, usedPrefix, isAdmin }) => {
 
         sorteos[chatId][dia] = mentioned
 
-        let list = await crearLista(mentioned) // AHORA ES AWAIT
+        let list = crearLista(mentioned)
         let msg = `${aurora}
     AURORA ${dia.toUpperCase()}
 ${aurora}
@@ -92,7 +86,7 @@ Usa *${usedPrefix}${dia}* para recordar`
         let asignados = sorteos[chatId][command.toLowerCase()]
         if (!asignados ||!asignados.length) return m.reply(`${aurora}\n CIELO VACÍO\nUsa: ${usedPrefix}set${command} @user\n${aurora}`)
 
-        let list = await crearLista(asignados) // AWAIT AQUI TAMBIEN
+        let list = crearLista(asignados)
 
         let msg = `${aurora}
     AURORA ${command.toUpperCase()}
@@ -127,8 +121,7 @@ ${aurora}\n`
         for(let d of dias){
             if(!Array.isArray(sorteos[chatId][d]) || sorteos[chatId][d].length === 0) continue
             txt += `\n🌌 ${emojis[d]} ${d.toUpperCase()}\n`
-            let listaDia = await crearLista(sorteos[chatId][d]) // AWAIT
-            txt += listaDia + '\n'
+            txt += crearLista(sorteos[chatId][d]) + '\n' // SIN AWAIT
             todos.push(...sorteos[chatId][d])
         }
         txt += `\n~* que las auroras los guíen *~`
